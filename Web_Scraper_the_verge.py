@@ -1,5 +1,4 @@
-# Install the required Python libraries
-# pip install requests beautifulsoup4
+# Importing the required libraries
 import requests
 from bs4 import BeautifulSoup
 import csv
@@ -7,53 +6,72 @@ from datetime import datetime
 import pandas as pd
 import sqlite3
 
-# Putting the URL of the website to scrape and sending a request to fetch the HTML content.
+# Defining the URL to scrape
 url = 'https://www.theverge.com/'
 
-response = requests.get(url)
+# Defining the name of the database to use
+dbname = 'verge_articles.db'
 
-# Parse the HTML content using BeautifulSoup and find the  headline, link, author, and date.
-soup = BeautifulSoup(response.content, 'html.parser')
+# Defining the name of the table to use
+tablename = 'articles'
 
-articles_divs = soup.find_all('div', {'class': 'c-entry-box--compact'})
+# Defining the name of the CSV file to use
+csvname = 'verge.csv'
 
-articles = []
-
-for article in articles_divs:
-    headline = article.find('meta', {'property': 'og:title'}).get('content')
-    link = article.find('meta', {'property': 'og:url'}).get('content')
-    author = article.find('meta', {'property': 'author'}).get('content')
-    date = article.find('meta', {'property': 'article:published_time'}).get('content').split('T')[0]
-    articles.append((link, headline, author, date))
+# Defining the function to get the articles
+def getingArticles():
+    # Sending a request to fetch the HTML content
+    response = requests.get(url)
     
-    print(f"Link: {link}")
-    print(f"Headline: {headline}")
-    print(f"Author: {author}")
-    print(f"Date: {date}")
+    # Parse the HTML content using BeautifulSoup and find the relevant elements
+    soup = BeautifulSoup(response.content, 'html.parser')
+    
+    articles_divs = soup.find_all('div', {'class': 'c-entry-box--compact'})
+    
+    articles = []
+    
+    for article in articles_divs:
+        # Geting the headline, link, author, and date of each article
+        headline = article.find('meta', {'property': 'og:title'}).get('content')
+        link = article.find('meta', {'property': 'og:url'}).get('content')
+        author = article.find('meta', {'property': 'author'}).get('content')
+        date = article.find('meta', {'property': 'article:published_time'}).get('content').split('T')[0]
+        
+        articles.append((link, headline, author, date))
+    
+    # Converting the list of articles into a pandas DataFrame
+    df = pd.DataFrame(articles, columns=['url', 'headline', 'author', 'date'])
+    
+    # Droping any duplicate articles
+    df = df.drop_duplicates()
+    
+    return df
 
-# saving data to csv file
-filename = datetime.now().strftime('%d%m%Y_verge.csv')
-df = pd.DataFrame(articles, columns=['URL', 'headline', 'author', 'date'])
-df.index.name = 'id'
-df.to_csv(filename)
+# Defining the function to save the articles to a CSV file
+def save_articles_into_csv(df):
+    # Creating a filename based on the current date
+    filename = datetime.now().strftime('%Y%m%d') + '_' + csvname
+    
+    # Saving the DataFrame to a CSV file
+    df.to_csv(filename, index=False)
 
-# Creating and connecting to a SQLite3 database and insert data into it
-conn = sqlite3.connect('verge_articles.db')
-c = conn.cursor()
+# Defining the function to save the articles to a SQL database
+def save_articles_into_sql(df):
+    # Creating a connection to the database
+    conn = sqlite3.connect(dbname)
+    
+    # Checking if the table already exists
+    if tablename in pd.read_sql("SELECT name FROM sqlite_master WHERE type='table'", conn)['name'].tolist():
+        # If the table already exists, deleting any articles that are already in the table
+        df.to_sql(tablename, conn, if_exists='replace', index=False)
+    else:
+        # If the table does not exist, creating it and inserting the articles
+        df.to_sql(tablename, conn, if_exists='append', index=False)
+    
+    # Closing the connection to the database
+    conn.close()
 
-# Creating table if not exists
-c.execute('''CREATE TABLE IF NOT EXISTS articles
-             (id INTEGER PRIMARY KEY AUTOINCREMENT,
-              url TEXT,
-              headline TEXT,
-              author TEXT,
-              date TEXT)''')
-
-# Inserting data into the table
-for article in articles:
-    c.execute("INSERT INTO articles (url, headline, author, date) VALUES (?, ?, ?, ?)",
-              (article[0], article[1], article[2], article[3]))
-
-# Commit changes and close connection
-conn.commit()
-conn.close()
+# Geting the articles and save them to a CSV file and a SQL database
+Articles_df = getingArticles()
+save_articles_into_csv(Articles_df)
+save_articles_into_sql(Articles_df)
