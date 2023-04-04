@@ -39,13 +39,12 @@ conn = sqlite3.connect('verge_articles.db')
 c = conn.cursor()
 
 # Create table
-c.execute('''CREATE TABLE articles
+c.execute('''CREATE TABLE IF NOT EXISTS articles
              (id INTEGER PRIMARY KEY AUTOINCREMENT,
               url TEXT,
               headline TEXT,
               author TEXT,
               date TEXT)''')
-
 # Insert data into the table
 for article in articles:
     c.execute("INSERT INTO articles (url, headline, author, date) VALUES (?, ?, ?, ?)",
