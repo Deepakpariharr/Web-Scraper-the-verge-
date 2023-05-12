@@ -72,6 +72,6 @@ def save_articles_into_sql(df):
     conn.close()
 
 # Geting the articles and save them to a CSV file and a SQL database
-Articles_df = getingArticles()
+Articles_df = getArticles()
 save_articles_into_csv(Articles_df)
 save_articles_into_sql(Articles_df)
